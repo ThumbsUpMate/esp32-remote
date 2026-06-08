@@ -27,6 +27,13 @@ export default {
           }
         });
 
+        if (!getRes.ok) {
+          return new Response("GitHub GET failed: " + getRes.status, {
+            status: 500,
+            headers: cors
+          });
+        }
+
         const data = await getRes.json();
         const decoded = atob((data.content || "").replace(/\n/g, ""));
 
@@ -59,6 +66,13 @@ export default {
         }
       });
 
+      if (!getRes.ok) {
+        return new Response("GitHub GET failed: " + getRes.status, {
+          status: 500,
+          headers: cors
+        });
+      }
+
       const fileData = await getRes.json();
       const encoded = btoa(value);
 
@@ -81,6 +95,7 @@ export default {
       });
 
       const result = await putRes.text();
+
       return new Response(result, {
         status: putRes.status,
         headers: {
@@ -90,9 +105,7 @@ export default {
       });
 
     } catch (err) {
-      // CRITICAL FIX:
-      // If ANYTHING throws, we STILL return CORS headers
-      return new Response("Worker error: " + err.message, {
+      return new Response("Worker crashed: " + err.message, {
         status: 500,
         headers: {
           "Content-Type": "text/plain",
