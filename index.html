@@ -1,105 +1,92 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>ESP32 Remote State</title>
-  <style>
-    body {
-      font-family: system-ui, sans-serif;
-      background: #0b1020;
-      color: #f5f5f5;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-    h1 {
-      margin-bottom: 0.5rem;
-    }
-    #state {
-      font-size: 2.5rem;
-      margin: 1rem 0 2rem;
-    }
-    button {
-      font-size: 1.2rem;
-      padding: 0.6rem 1.4rem;
-      margin: 0 0.5rem;
-      border-radius: 6px;
-      border: none;
-      cursor: pointer;
-      color: #fff;
-    }
-    #btn-on {
-      background: #16a34a;
-    }
-    #btn-off {
-      background: #dc2626;
-    }
-    #status {
-      margin-top: 1rem;
-      font-size: 0.9rem;
-      opacity: 0.8;
-    }
-  </style>
-</head>
-<body>
-  <h1>ESP32 Remote</h1>
-  <div>Current state:</div>
-  <div id="state">…</div>
-  <div>
-    <button id="btn-on">ON</button>
-    <button id="btn-off">OFF</button>
-  </div>
-  <div id="status"></div>
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const apiUrl = "https://api.github.com/repos/ThumbsUpMate/esp32-remote/contents/state.txt";
 
-  <script>
-    const WORKER_BASE = "https://esp32-remote.mail-08d.workers.dev";
-    const stateEl = document.getElementById("state");
-    const statusEl = document.getElementById("status");
-    const btnOn = document.getElementById("btn-on");
-    const btnOff = document.getElementById("btn-off");
+    // CORS helper
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type"
+    };
 
-    async function setState(value) {
-      statusEl.textContent = "Updating...";
-      try {
-        const res = await fetch(`${WORKER_BASE}?value=${encodeURIComponent(value)}`);
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${text}`);
+    // Handle OPTIONS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: cors });
+    }
+
+    //
+    // 1. READ CURRENT STATE
+    //
+    if (url.searchParams.get("getstate") === "1") {
+      const getRes = await fetch(apiUrl, {
+        headers: {
+          "Authorization": "Bearer " + env.GITHUB_TOKEN,
+          "Accept": "application/vnd.github+json",
+          "User-Agent": "esp32-remote-worker"
         }
-        stateEl.textContent = value;
-        statusEl.textContent = "Updated successfully.";
-      } catch (err) {
-        console.error(err);
-        statusEl.textContent = "Error: " + err.message;
-      }
-    }
+      });
 
-    async function fetchCurrentState() {
-      statusEl.textContent = "Loading...";
-      try {
-        const res = await fetch(`${WORKER_BASE}?getstate=1`);
-        const text = await res.text();
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${text}`);
+      const data = await getRes.json();
+      const decoded = atob((data.content || "").replace(/\n/g, ""));
+
+      return new Response(decoded.trim(), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain",
+          ...cors
         }
-        const value = text.trim();
-        stateEl.textContent = value || "UNKNOWN";
-        statusEl.textContent = "";
-      } catch (err) {
-        console.error(err);
-        stateEl.textContent = "UNKNOWN";
-        statusEl.textContent = "Could not fetch current state: " + err.message;
-      }
+      });
     }
 
-    btnOn.addEventListener("click", () => setState("ON"));
-    btnOff.addEventListener("click", () => setState("OFF"));
+    //
+    // 2. UPDATE STATE
+    //
+    const value = url.searchParams.get("value");
+    if (!value) {
+      return new Response("Missing value", {
+        status: 400,
+        headers: cors
+      });
+    }
 
-    // Load initial state
-    fetchCurrentState();
-  </script>
-</body>
-</html>
+    // GET SHA
+    const getRes = await fetch(apiUrl, {
+      headers: {
+        "Authorization": "Bearer " + env.GITHUB_TOKEN,
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "esp32-remote-worker"
+      }
+    });
+
+    const fileData = await getRes.json();
+    const encoded = btoa(value);
+
+    const body = {
+      message: "Update state",
+      content: encoded,
+      sha: fileData.sha
+    };
+
+    // PUT update
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Authorization": "Bearer " + env.GITHUB_TOKEN,
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "esp32-remote-worker"
+      },
+      body: JSON.stringify(body)
+    });
+
+    const result = await putRes.text();
+    return new Response(result, {
+      status: putRes.status,
+      headers: {
+        "Content-Type": "application/json",
+        ...cors
+      }
+    });
+  }
+};
