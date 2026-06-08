@@ -8,7 +8,7 @@
 
 <script>
 async function setState(value) {
-    const url = "https://api.github.com/repos/YOUR_USERNAME/esp32-remote/contents/state.txt";
+    const url = "https://api.github.com/repos/ThumbsUpMate/esp32-remote/contents/state.txt";
 
     const response = await fetch(url);
     const data = await response.json();
@@ -22,7 +22,7 @@ async function setState(value) {
     await fetch(url, {
         method: "PUT",
         headers: {
-            "Authorization": "Bearer YOUR_TOKEN",
+            "Authorization": "Bearer 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",
             "Content-Type": "application/json"
         },
         body: JSON.stringify(update)
