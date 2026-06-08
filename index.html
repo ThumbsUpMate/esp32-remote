@@ -21,9 +21,11 @@ async function setState(value) {
 
     await fetch(url, {
         method: "PUT",
+        mode: "cors",
         headers: {
             "Authorization": "Bearer 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",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28"
         },
         body: JSON.stringify(update)
     });
