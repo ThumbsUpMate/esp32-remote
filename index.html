@@ -16,7 +16,7 @@
       margin: 0;
     }
     h1 {
-      margin-bottom: 0.50rem;
+      margin-bottom: 0.5rem;
     }
     #state {
       font-size: 2.5rem;
@@ -64,11 +64,10 @@
     async function setState(value) {
       statusEl.textContent = "Updating...";
       try {
-        const res = await fetch(`${WORKER_BASE}?value=${encodeURIComponent(value)}`, {
-          method: "GET"
-        });
+        const res = await fetch(`${WORKER_BASE}?value=${encodeURIComponent(value)}`);
+        const text = await res.text();
         if (!res.ok) {
-          throw new Error("HTTP " + res.status);
+          throw new Error(`HTTP ${res.status}: ${text}`);
         }
         stateEl.textContent = value;
         statusEl.textContent = "Updated successfully.";
@@ -79,23 +78,27 @@
     }
 
     async function fetchCurrentState() {
+      statusEl.textContent = "Loading...";
       try {
         const res = await fetch(`${WORKER_BASE}?getstate=1`);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const text = (await res.text()).trim();
-        stateEl.textContent = text || "UNKNOWN";
+        const text = await res.text();
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${text}`);
+        }
+        const value = text.trim();
+        stateEl.textContent = value || "UNKNOWN";
         statusEl.textContent = "";
       } catch (err) {
         console.error(err);
         stateEl.textContent = "UNKNOWN";
-        statusEl.textContent = "Could not fetch current state.";
+        statusEl.textContent = "Could not fetch current state: " + err.message;
       }
     }
 
     btnOn.addEventListener("click", () => setState("ON"));
     btnOff.addEventListener("click", () => setState("OFF"));
 
-    // Load initial state from GitHub
+    // Load initial state
     fetchCurrentState();
   </script>
 </body>
