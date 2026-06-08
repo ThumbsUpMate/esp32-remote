@@ -64,9 +64,12 @@
     async function setState(value) {
       statusEl.textContent = "Updating...";
       try {
-        const res = await fetch(`${WORKER_BASE}?value=${encodeURIComponent(value)}`);
-        const text = await res.text();
-        if (!res.ok) throw new Error(text);
+        const res = await fetch(`${WORKER_BASE}?value=${encodeURIComponent(value)}`, {
+          method: "GET"
+        });
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
         stateEl.textContent = value;
         statusEl.textContent = "Updated successfully.";
       } catch (err) {
@@ -76,23 +79,23 @@
     }
 
     async function fetchCurrentState() {
-      statusEl.textContent = "Loading...";
       try {
         const res = await fetch(`${WORKER_BASE}?getstate=1`);
-        const text = await res.text();
-        if (!res.ok) throw new Error(text);
-        stateEl.textContent = text.trim() || "UNKNOWN";
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const text = (await res.text()).trim();
+        stateEl.textContent = text || "UNKNOWN";
         statusEl.textContent = "";
       } catch (err) {
         console.error(err);
         stateEl.textContent = "UNKNOWN";
-        statusEl.textContent = "Could not fetch current state: " + err.message;
+        statusEl.textContent = "Could not fetch current state.";
       }
     }
 
     btnOn.addEventListener("click", () => setState("ON"));
     btnOff.addEventListener("click", () => setState("OFF"));
 
+    // Load initial state from GitHub
     fetchCurrentState();
   </script>
 </body>
