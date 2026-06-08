@@ -1,24 +1,56 @@
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const apiUrl = "https://api.github.com/repos/ThumbsUpMate/esp32-remote/contents/state.txt";
-
-    // CORS headers
     const cors = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "*"
     };
 
-    // OPTIONS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: cors });
-    }
+    try {
+      const url = new URL(request.url);
+      const apiUrl = "https://api.github.com/repos/ThumbsUpMate/esp32-remote/contents/state.txt";
 
-    //
-    // 1. GET STATE
-    //
-    if (url.searchParams.get("getstate") === "1") {
+      // OPTIONS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, { status: 204, headers: cors });
+      }
+
+      //
+      // 1. GET STATE
+      //
+      if (url.searchParams.get("getstate") === "1") {
+        const getRes = await fetch(apiUrl, {
+          headers: {
+            "Authorization": "Bearer " + env.GITHUB_TOKEN,
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "esp32-remote-worker"
+          }
+        });
+
+        const data = await getRes.json();
+        const decoded = atob((data.content || "").replace(/\n/g, ""));
+
+        return new Response(decoded.trim(), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/plain",
+            ...cors
+          }
+        });
+      }
+
+      //
+      // 2. UPDATE STATE
+      //
+      const value = url.searchParams.get("value");
+      if (!value) {
+        return new Response("Missing value", {
+          status: 400,
+          headers: cors
+        });
+      }
+
+      // GET SHA
       const getRes = await fetch(apiUrl, {
         headers: {
           "Authorization": "Bearer " + env.GITHUB_TOKEN,
@@ -27,66 +59,46 @@ export default {
         }
       });
 
-      const data = await getRes.json();
-      const decoded = atob((data.content || "").replace(/\n/g, ""));
+      const fileData = await getRes.json();
+      const encoded = btoa(value);
 
-      return new Response(decoded.trim(), {
-        status: 200,
+      const body = {
+        message: "Update state",
+        content: encoded,
+        sha: fileData.sha
+      };
+
+      // PUT update
+      const putRes = await fetch(apiUrl, {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer " + env.GITHUB_TOKEN,
+          "Accept": "application/vnd.github+json",
+          "Content-Type": "application/json",
+          "User-Agent": "esp32-remote-worker"
+        },
+        body: JSON.stringify(body)
+      });
+
+      const result = await putRes.text();
+      return new Response(result, {
+        status: putRes.status,
+        headers: {
+          "Content-Type": "application/json",
+          ...cors
+        }
+      });
+
+    } catch (err) {
+      // CRITICAL FIX:
+      // If ANYTHING throws, we STILL return CORS headers
+      return new Response("Worker error: " + err.message, {
+        status: 500,
         headers: {
           "Content-Type": "text/plain",
           ...cors
         }
       });
     }
-
-    //
-    // 2. UPDATE STATE
-    //
-    const value = url.searchParams.get("value");
-    if (!value) {
-      return new Response("Missing value", {
-        status: 400,
-        headers: cors
-      });
-    }
-
-    // GET SHA
-    const getRes = await fetch(apiUrl, {
-      headers: {
-        "Authorization": "Bearer " + env.GITHUB_TOKEN,
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "esp32-remote-worker"
-      }
-    });
-
-    const fileData = await getRes.json();
-    const encoded = btoa(value);
-
-    const body = {
-      message: "Update state",
-      content: encoded,
-      sha: fileData.sha
-    };
-
-    // PUT update
-    const putRes = await fetch(apiUrl, {
-      method: "PUT",
-      headers: {
-        "Authorization": "Bearer " + env.GITHUB_TOKEN,
-        "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json",
-        "User-Agent": "esp32-remote-worker"
-      },
-      body: JSON.stringify(body)
-    });
-
-    const result = await putRes.text();
-    return new Response(result, {
-      status: putRes.status,
-      headers: {
-        "Content-Type": "application/json",
-        ...cors
-      }
-    });
   }
 };
