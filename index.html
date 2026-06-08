@@ -80,9 +80,7 @@
 
     async function fetchCurrentState() {
       try {
-        const res = await fetch(
-          "https://raw.githubusercontent.com/ThumbsUpMate/esp32-remote/main/state.txt"
-        );
+        const res = await fetch(`${WORKER_BASE}?getstate=1`);
         if (!res.ok) throw new Error("HTTP " + res.status);
         const text = (await res.text()).trim();
         stateEl.textContent = text || "UNKNOWN";
