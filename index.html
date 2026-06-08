@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>ESP32 Remote Switch</h2>
+
+<button onclick="setState('ON')">Turn ON</button>
+<button onclick="setState('OFF')">Turn OFF</button>
+
+<script>
+async function setState(value) {
+    const url = "https://api.github.com/repos/YOUR_USERNAME/esp32-remote/contents/state.txt";
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const update = {
+        message: "Update state",
+        content: btoa(value),
+        sha: data.sha
+    };
+
+    await fetch(url, {
+        method: "PUT",
+        headers: {
+            "Authorization": "Bearer YOUR_TOKEN",
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(update)
+    });
+
+    alert("State set to " + value);
+}
+</script>
+</body>
+</html>
